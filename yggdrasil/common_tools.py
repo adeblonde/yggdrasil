@@ -26,6 +26,8 @@ def create_logger(logfile='') :
 
     logger.info('Logger created')
 
+    return logger
+
 def load_aws_credentials(logger, aws_creds_file) :
 
     """ this function loads the AWS credentials from a file into a dictionary """
@@ -35,7 +37,9 @@ def load_aws_credentials(logger, aws_creds_file) :
     try :
         with open(aws_creds, 'r') as f_read :
             data = f_read.read().split(',')
-            # aws_creds['aws_acces_key_id'] = data[2]
-            # aws_creds['aws_secret_key'] = data[3]
+            aws_creds['aws_acces_key_id'] = data[2]
+            aws_creds['aws_secret_key'] = data[3]
     except Exception as e :
         logger.info('The input file does not exist or cannot be read : error %s' % e)
+
+    return aws_creds
