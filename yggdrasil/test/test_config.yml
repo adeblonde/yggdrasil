@@ -3,7 +3,12 @@
 
   infrastructure :
   - provider : aws
-  - credential_file : 'WORK_DIR/auth'
+  - region : 'eu-west-1'
+  - profile : developer
+  - credentials_file : 'AUTH_DIR/CRED_FILE'
+  - ssh_key : 'AUTH_DIR/SSH_KEY'
+  - vault_password_file : 'AUTH_DIR/VAULT_PSSWD'
+  - encrypted_creds_file : 'AUTH_DIR/ENCRYPT_CRED'
   - machines :
     - model_1 : 
         name : master_machine
@@ -14,6 +19,7 @@
         aws_specs :
           - AMI : XXXX
           - type : t2.small
+          - region : 'eu-west-1'
         config_scripts :
           - 'test_playbooks/config_master.yml'
 
@@ -26,13 +32,38 @@
         aws_specs :
           - AMI : XXXX
           - type : t2.small
+          - region : 'eu-west-1'
         config_scripts :
           - 'test_playbooks/config_worker.yml'
+
+  data_sending :
+    - test_file :
+        origin : 'WORK_DIR/test.txt'
+        destination : '/home/ubuntu'
+        isfolder : False
+        by_names :
+        - master_machine_0
+        - worker_machine_0
+        by_groups :
+        - master
+        - server
+
+  data_receiving :
+    - test_file :
+        origin : 'WORK_DIR/test.txt'
+        destination : '/home/ubuntu'
+        isfolder : False
+        by_names :
+        - master_machine_0
+        - worker_machine_0
+        by_groups :
+        - master
+        - server
 
   jobs :
   - job_single :
       name : job_single
-      target : master_machine_1
+      target : master_machine_0
       job_scripts :
         - 'test_playbooks/job_single.yml'
   - job_group :
@@ -49,3 +80,5 @@
 
   options :
   - shutdown_after_complete : false
+  - data_only : false
+  - no_data : false
