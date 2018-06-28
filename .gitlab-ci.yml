@@ -1,0 +1,5 @@
+image: "python:3"
+
+test:
+  stage : test
+  script: test/unit_test.sh

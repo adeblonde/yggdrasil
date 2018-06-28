@@ -1,0 +1,84 @@
+---
+- config_name : test_config
+
+  infrastructure :
+  - provider : aws
+  - region : 'eu-west-1'
+  - profile : developer
+  - credentials_file : 'AUTH_DIR/CRED_FILE'
+  - ssh_key : 'AUTH_DIR/SSH_KEY'
+  - vault_password_file : 'AUTH_DIR/VAULT_PSSWD'
+  - encrypted_creds_file : 'AUTH_DIR/ENCRYPT_CRED'
+  - machines :
+    - model_1 : 
+        name : master_machine
+        number : 1
+        groups :
+          - master
+          - front
+        aws_specs :
+          - AMI : XXXX
+          - type : t2.small
+          - region : 'eu-west-1'
+        config_scripts :
+          - 'test_playbooks/config_master.yml'
+
+    - model_2 : 
+        name : worker_machine
+        number : 2
+        groups :
+          - worker
+          - server
+        aws_specs :
+          - AMI : XXXX
+          - type : t2.small
+          - region : 'eu-west-1'
+        config_scripts :
+          - 'test_playbooks/config_worker.yml'
+
+  data_sending :
+    - test_file :
+        origin : 'WORK_DIR/test.txt'
+        destination : '/home/ubuntu'
+        isfolder : False
+        by_names :
+        - master_machine_0
+        - worker_machine_0
+        by_groups :
+        - master
+        - server
+
+  data_receiving :
+    - test_file :
+        origin : 'WORK_DIR/test.txt'
+        destination : '/home/ubuntu'
+        isfolder : False
+        by_names :
+        - master_machine_0
+        - worker_machine_0
+        by_groups :
+        - master
+        - server
+
+  jobs :
+  - job_single :
+      name : job_single
+      target : master_machine_0
+      job_scripts :
+        - 'test_playbooks/job_single.yml'
+  - job_group :
+      name : job_group
+      target : worker
+      job_scripts :
+        - 'test_playbooks/job_group.yml'
+  - job_pool :
+      name : job_pool
+      target : worker
+      job_scripts :
+        - 'test_playbooks/job_pool_1.yml'
+        - 'test_playbooks/job_pool_2.yml'
+
+  options :
+  - shutdown_after_complete : false
+  - data_only : false
+  - no_data : false
