@@ -14,3 +14,4 @@ class GlobalTest(unittest.TestCase) :
 
     """ test writing to S3 """
     def test_write2s3(self) :
+		self.name = 'test writing to S3'

@@ -1,114 +1,179 @@
-from .common_tools import *
+from common_tools import *
+from terraform.aws import *
+from ansible_resources.ansible_setting import *
+# from ansible_templates import *
 import os
 import sys
 import yaml
 import fileinput
 import shutil
-
+import pkg_resources
+import copy
+import json
 import click
-
-from python_terraform import * 
-
 from os.path import join
+
+# import python_terraform as tf
+from python_terraform import *
 
 import pdb
 
+DATA_PATH = pkg_resources.resource_filename('yggdrasil', '.')
+
+ami2user = {
+	'ami-2a7d75c0' : 'ubuntu'
+}
+
 @click.command()
-@click.option('--shutdownatend','-s',default=False,help='Do you want to shutdown host machines after execution of all jobs ?')
-@click.option('--dryrun','-d',default=False,help='Execute a dry run of the Terraform configuration, Ansible jobs won\'t be executed')
-@click.option('--configfile','-c',default='./yggdrasil_config.yml',help='Path to yggdrasil configuration file')
-@click.option('--workfolder',default='.',help='Location of the working folder that will be created with temporary file, name after \'config_name\'')
-def ygg(configfile, workfolder, dryrun, shutdownatend) :
+@click.argument('configfile', default='./yggdrasil_config.yml',help='Path to yggdrasil configuration file')
+@click.option('--shutdownatend','-s', default=False,help='Do you want to shutdown host machines after execution of all jobs ?')
+@click.option('--dryrun','-d', default=False,help='Execute a dry run of the Terraform configuration, Ansible jobs won\'t be executed')
+@click.option('--workfolder','-w', default='.',help='Location of the working folder that will be created with temporary file, name after \'config_name\'')
+def ygg(configfile, workfolder, dryrun=False, shutdownatend=False) :
 
-    """ main yggdrasil function """
-    print("Begin execution of Yggdrasil!")
+	""" we execute the run options with the provided arguments """
+	run(configfile, workfolder, dryrun=False, shutdownatend=False)
 
-    work_dir = workfolder
+@click.command()
+@click.argument('configfile', help='Yggdrasil YAML configuration file to set')
+@click.option('--output','-o', help='Yggdrasil YAML configuration file set')
+@click.option('--params','-f', help='JSON file with all the parameters to set in the Yggdrasil\'s configuration file')
+@click.option('--variable','-v', type=(unicode, unicode), multiple=True)
+def ygg_config(configfile, output, params, variable):
 
-    """ init logger """
-    logger = create_logger(join(work_dir,'ygg.log'))
+	""" this function is used to set the variables in an Yggdrasil's unset configuration file """
+	with open(configfile) as f :
+		config = f.read()
 
-    """ parse config file """
-    with open(configfile) as f :
-        config = yaml.load(f)
-        print(config)
+	if output is None :
+		output = os.getcwd()
+		output_name = os.path.basename(configfile)
+		output_name = 'set_' + output_name
+		output = join(output, output_name)
 
-    """ create work folder """
-    if os.path.exists(work_dir) is False :
-        os.makedirs(work_dir)
+	output_folder = os.path.dirname(output)
+	makedir_p(output_folder)
 
-    """ set cloud credentials """
-    cloud_creds = dict()
-    provider = config['infrastructure']['provider']
-    tf_resources = ''
+	parameters = dict()
 
-    if provider == 'aws' :
-        cloud_creds = load_aws_credentials(logger, config['infrastructure']['credentials_file'])
+	if params is not None :
+		with open(params) as f :
+			parameters = json.load(f)
 
-        tf_resources = join(__file__, 'terraform_resources', 'aws')
+	if variable is not None :
+		for key, value in variable :
+			parameters[key] = value
 
-        shutil.copyfile(join(tf_resources, 'aws_config_template'), join(work_dir, 'config'))
-        shutil.copyfile(join(tf_resources, 'aws_credentials_template'), join(work_dir, 'credentials'))
+	for param in parameters.keys() :
+		config = config.replace(param, parameters[param])
 
-        """ set the AWS config file """
-        for line in fileinput.input(join(work_dir, 'config'), inplace=True) :
-            print(line.replace('default',config['infrastructure']['profile']))
-            print(line.replace('AWS_REGION',config['infrastructure']['region']))
+	with open(output, 'w') as f :
+		f.write(config)
 
-        """ set the AWS credentials file """
-        for line in fileinput.input(join(work_dir, 'credentials'), inplace=True) :
-            print(line.replace('AWS_ACCESS_KEY',cloud_creds['aws_acces_key_id']))
-            print(line.replace('AWS_SECRET_KEY',cloud_creds['aws_secret_key']))
+def run(configfile, workfolder, dryrun=False, shutdownatend=False) :
 
-    """ create the terraform config file """
-    tf_config = ''
-    if provider == 'aws' :
+	""" the run function is separated from the main CLI function ygg, for modularity purposes """
 
-        with open(join(tf_resources, 'aws_header.tf'), 'r') as f :
-            tf_header = f.read()
+	""" main yggdrasil function """
+	print("Begin execution of Yggdrasil!")
 
-        with open(join(tf_resources, 'aws_instance.tf'), 'r') as f :
-            tf_instance = f.read()
+	work_dir = workfolder
 
-        tf_header.replace('AWS_ACCESS_KEY',cloud_creds['aws_acces_key_id']))
-        tf_header.replace('AWS_SECRET_KEY',cloud_creds['aws_secret_key']))
-        tf_header.replace('AWS_REGION',config['infrastructure']['region']))
+	""" init logger """
+	logger = create_logger(join(work_dir,'ygg.log'))
 
-        tf_config = tf_header
+	""" parse config file """
+	with open(configfile) as f :
+		config = yaml.load(f)
 
-        for model in config['infrastructure']['machines'] :
-            current_model = deepcopy(tf_instance)
-            current_model.replace('NUMBER',model['number'])
-            current_model.replace('AMI',model['aws_specs']['AMI'])
-            current_model.replace('TYPE',model['aws_specs']['type'])
-            tf_config += current_model
+	""" create work folder """
+	if os.path.exists(work_dir) is False :
+		os.makedirs(work_dir)
 
-    with open(join(work_dir, config['config_name'] + '.tf'), 'w') as f :
-        f.write(tf_config)
+	""" Terraform part """
+	logger.info("Terraform part")
 
-    """ run Terraform """
-    t = Terraform(working_dir=work_dir)
-    if dryrun == True :
-        tf.test()
-        return 
-    else :
-        tf.apply(no_color=IsFlagged, refresh=False)
+	""" init terraform config file """
+	tf_config = ''
 
-    """ prepare .ini files for Ansible """
+	""" prepare Terraform config file """
+	for provider in config['infrastructure']['providers'] :
+		provider = provider['provider']
 
-    """ add SSH certificates to known_hosts """
+		if provider == 'aws' :
 
-    """ send data to machines """
+			logger.info("Creating AWS config file")
+			tf_config = terraform_set_aws(logger, DATA_PATH, work_dir, config)
 
-    """ apply ansible """
+	with open(join(work_dir, config['config_name'] + '.tf'), 'w') as f :
+		f.write(tf_config)
 
+	# """ run Terraform """
+	# logger.info("Run Terraform")
+	# tf = Terraform(working_dir=work_dir)
+	# print(tf.init())
+	# logger.info("Terraform loaded")
+	# logger.info("Planning")
+	# print(tf.plan(no_color=IsFlagged, refresh=False, capture_output=True))
+	# if dryrun == False :
+	# 	logger.info("Applying")
+	# 	print(tf.apply(no_color=IsFlagged, refresh=False, skip_plan=True))
 
+	""" Ansible part """
+	logger.info("Ansible part")
 
+	""" we parse the .tfstate file to gather public IPs addresses """
+	logger.info("Parsing .tfstate")
+	host_ips, host_usernames, group_hosts = gather_ips(work_dir, ami2user, logger)
 
+	""" create Ansible config tree """
+	logger.info("Creating Ansible config tree")
+	ansible_dir, ansible_production_dir, ansible_roles_dir = create_config_tree(logger, work_dir)
 
+	""" create hosts file """
+	logger.info("Creating Ansible hosts file")
+	production_hosts_path = create_host_file(logger, config, host_ips, group_hosts, ansible_production_dir)
 
+	""" set an SSH connection that will accept unknown hosts """	
+	logger.info("Setting SSH connection""")
+	ssh = set_ssh_connection()
 
+	""" sending data to hosts """
+	logger.info("Sending data to remote hosts")
+	scp_data(ssh, logger, host_ips, group_hosts, host_usernames, config, 'sending')
 
+	""" collect all ansible playbooks paths """
+	logger.info("Collecting all ansible playbooks paths")
+	modules_playbooks = join(DATA_PATH, 'playbooks')
+	playbooks_folder = [modules_playbooks]
+	playbooks_path = collect_playbooks_paths(logger, config, playbooks_folder)
+
+	""" collecting all synchronous jobs """
+	logger.info("Collecting all synchronous jobs")
+	main_ansible_path = collect_synchronous_jobs(logger, config, ansible_roles_dir, ansible_dir, playbooks_path)
+
+	""" Execution of synchronous jobs """
+	logger.info("Executing Ansible synchronous tasks")
+	try :
+		result = subprocess.call(['/usr/bin/ansible-playbook', '-i', production_hosts_path, main_ansible_path])
+		logger.info("Result of ansible call : %s" % result)
+	except :
+		logger.info("Problem in the execution of ansible playbooks")
+
+	""" implementing workers pool jobs """
+	logger.info("Collecting Ansible asynchronous tasks")
+	processes = prepare_pool_jobs(logger, config, ansible_dir, production_hosts_path, playbooks_path, group_hosts)
+
+	logger.info("Executing Ansible asynchronous tasks")
+	for p in processes :
+		p.start()
+
+	for p in processes :
+		p.join()
+
+	""" receiving from to hosts """
+	logger.info("Receiving data from remote hosts")
+	scp_data(ssh, logger, host_ips, group_hosts, host_usernames, config, 'receiving')
 
 if __name__ == "__main__" :
-    ygg()
+	run(sys.argv[1], sys.argv[2])

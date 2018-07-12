@@ -1,7 +1,13 @@
 #!/bin/bash
 
+### run tests 
+# python3 setup.py test
+
 ### python unit tests
 nosetests
 
-### run tests 
-python3 setup.py test
+### activate test virtualenv
+# ../testenv/bin/activate
+
+### recompile and reinstall package
+pip3 install -e .

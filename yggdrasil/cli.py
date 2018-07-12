@@ -5,5 +5,5 @@ import click
 @click.command()
 def main() :
 
-    """ First command """
-    click.echo("Hello world")
+	""" First command """
+	click.echo("Hello world")
