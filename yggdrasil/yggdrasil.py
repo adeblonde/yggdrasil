@@ -1,6 +1,7 @@
-from common_tools import *
-from terraform.aws import *
-from ansible_resources.ansible_setting import *
+from .common_tools import *
+from .terraform.aws import *
+from .ansible_resources.ansible_setting import *
+from .security.secure_credentials import *
 # from ansible_templates import *
 import os
 import sys
@@ -24,71 +25,86 @@ ami2user = {
 	'ami-2a7d75c0' : 'ubuntu'
 }
 
-@click.command()
-@click.argument('configfile', default='./yggdrasil_config.yml',help='Path to yggdrasil configuration file')
-@click.option('--shutdownatend','-s', default=False,help='Do you want to shutdown host machines after execution of all jobs ?')
-@click.option('--dryrun','-d', default=False,help='Execute a dry run of the Terraform configuration, Ansible jobs won\'t be executed')
-@click.option('--workfolder','-w', default='.',help='Location of the working folder that will be created with temporary file, name after \'config_name\'')
-def ygg(configfile, workfolder, dryrun=False, shutdownatend=False) :
+def set_parameters(logger, configfile, params, variable=None) :
 
-	""" we execute the run options with the provided arguments """
-	run(configfile, workfolder, dryrun=False, shutdownatend=False)
-
-@click.command()
-@click.argument('configfile', help='Yggdrasil YAML configuration file to set')
-@click.option('--output','-o', help='Yggdrasil YAML configuration file set')
-@click.option('--params','-f', help='JSON file with all the parameters to set in the Yggdrasil\'s configuration file')
-@click.option('--variable','-v', type=(unicode, unicode), multiple=True)
-def ygg_config(configfile, output, params, variable):
-
-	""" this function is used to set the variables in an Yggdrasil's unset configuration file """
+	""" this function extract a configuration from a YAML config file and set the unset parameters using a params file """
 	with open(configfile) as f :
 		config = f.read()
+		config_params = yaml.load(config)['parameters']
 
-	if output is None :
-		output = os.getcwd()
-		output_name = os.path.basename(configfile)
-		output_name = 'set_' + output_name
-		output = join(output, output_name)
-
-	output_folder = os.path.dirname(output)
-	makedir_p(output_folder)
+	# logger.info("Initial config : %s" % config)
 
 	parameters = dict()
 
 	if params is not None :
 		with open(params) as f :
-			parameters = json.load(f)
+			parameters = yaml.load(f.read())['parameters']
+			logger.info("Parameters loaded : %s" % parameters)
+			# parameters = json.load(f)
 
 	if variable is not None :
 		for key, value in variable :
 			parameters[key] = value
 
 	for param in parameters.keys() :
-		config = config.replace(param, parameters[param])
+		# if param in config_params.keys():
+		if param in config_params :
+			config = config.replace(param, parameters[param])
 
-	with open(output, 'w') as f :
-		f.write(config)
+	# logger.info("Set config : %s" % config)
 
-def run(configfile, workfolder, dryrun=False, shutdownatend=False) :
+	return yaml.load(config)
+
+@click.command()
+@click.argument('configfile', default='./yggdrasil_config.yml')
+# @click.argument('configfile', default='./yggdrasil_config.yml',help='Path to yggdrasil configuration file')
+@click.option('--parameters','-p', default=None,help='YAML file storing parameters to set in the configuration file')
+@click.option('--shutdownatend','-s', default=False,help='Do you want to shutdown host machines after execution of all jobs ?')
+@click.option('--dryrun','-d', default=False,help='Execute a dry run of the Terraform configuration, Ansible jobs won\'t be executed')
+@click.option('--workfolder','-w', default='.',help='Location of the working folder that will be created with temporary file, name after \'config_name\'')
+def ygg(configfile, workfolder, parameters, variable=None, dryrun=False, shutdownatend=False) :
+
+	""" we execute the run options with the provided arguments """
+	run(configfile, workfolder, parameters, variable, dryrun, shutdownatend)
+
+# @click.command()
+# @click.argument('configfile', help='Yggdrasil YAML configuration file to set')
+# @click.option('--output','-o', help='Yggdrasil YAML configuration file set')
+# @click.option('--params','-f', help='JSON file with all the parameters to set in the Yggdrasil\'s configuration file')
+# @click.option('--variable','-v', type=(unicode, unicode), multiple=True)
+# def ygg_config(configfile, output, params, variable):
+
+# 	""" this function is used to set the variables in an Yggdrasil's unset configuration file """
+# 	if output is None :
+# 		output = os.getcwd()
+# 		output_name = os.path.basename(configfile)
+# 		output_name = 'set_' + output_name
+# 		output = join(output, output_name)
+
+# 	output_folder = os.path.dirname(output)
+# 	makedir_p(output_folder)
+
+# 	config = set_parameters(configfile, params, variable)
+
+# 	with open(output, 'w') as f :
+# 		f.write(config)
+
+def run(configfile, workfolder, params, variable=None, dryrun=False, shutdownatend=False) :
 
 	""" the run function is separated from the main CLI function ygg, for modularity purposes """
 
 	""" main yggdrasil function """
 	print("Begin execution of Yggdrasil!")
 
+	""" create work folder """
 	work_dir = workfolder
+	makedir_p(work_dir)
 
 	""" init logger """
 	logger = create_logger(join(work_dir,'ygg.log'))
 
 	""" parse config file """
-	with open(configfile) as f :
-		config = yaml.load(f)
-
-	""" create work folder """
-	if os.path.exists(work_dir) is False :
-		os.makedirs(work_dir)
+	config = set_parameters(logger, configfile, params, variable)
 
 	""" Terraform part """
 	logger.info("Terraform part")
@@ -97,27 +113,46 @@ def run(configfile, workfolder, dryrun=False, shutdownatend=False) :
 	tf_config = ''
 
 	""" prepare Terraform config file """
+	logger.info("Configuration content : %s" %config)
+	# logger.info("Configuration content : %s" % config['config_name'])
+	tf_cloud_creds = ''
 	for provider in config['infrastructure']['providers'] :
 		provider = provider['provider']
 
-		if provider == 'aws' :
+		if provider['provider_name'] == 'aws' :
 
-			logger.info("Creating AWS config file")
-			tf_config = terraform_set_aws(logger, DATA_PATH, work_dir, config)
+			# logger.info("Creating encrypted Ansible AWS credentials file")
+			# auth_dir = config['ansible_resources']['vault_dir']
+			# makedir_p(auth_dir)
+			# aws_encrypted_creds = os.path.join(auth_dir, config['config_name'] + '_aws_encrypted.yml')
+
+			# secure_ansible_aws(logger, auth_dir, provider, aws_encrypted_creds, config['ansible_resources']['vault_password_file'])
+			# logger.info("Successfully created encrypted Ansible creds file %s" % aws_encrypted_creds)
+
+			# logger.info("Creating Terraform variables file storing AWS credentials")
+			# auth_dir = config['terraform_resources']['credentials_dir']
+			# tf_aws_creds = os.path.join(auth_dir, config['config_name'] + '_aws_creds.tfvars')
+			# secure_tf_aws(logger, auth_dir, provider, tf_aws_creds)
+			# logger.info("Successfully created variables file %s" % tf_aws_creds)
+			# tf_cloud_creds = tf_aws_creds
+
+			logger.info("Configuring Terraform file")
+			tf_config = terraform_set_aws(logger, DATA_PATH, work_dir, provider)
 
 	with open(join(work_dir, config['config_name'] + '.tf'), 'w') as f :
 		f.write(tf_config)
 
-	# """ run Terraform """
-	# logger.info("Run Terraform")
-	# tf = Terraform(working_dir=work_dir)
-	# print(tf.init())
-	# logger.info("Terraform loaded")
-	# logger.info("Planning")
-	# print(tf.plan(no_color=IsFlagged, refresh=False, capture_output=True))
-	# if dryrun == False :
-	# 	logger.info("Applying")
-	# 	print(tf.apply(no_color=IsFlagged, refresh=False, skip_plan=True))
+	""" run Terraform """
+	logger.info("Run Terraform")
+	tf = Terraform(working_dir=work_dir)
+	print(tf.init())
+	logger.info("Terraform loaded")
+	logger.info("Cloud credentials file used : %s" % tf_cloud_creds)
+	logger.info("Planning")
+	print(tf.plan(no_color=IsFlagged, refresh=False, capture_output=True, var_file=tf_cloud_creds))
+	if dryrun == False :
+		logger.info("Applying")
+		print(tf.apply(no_color=IsFlagged, refresh=False, skip_plan=True, var_file=tf_cloud_creds))
 
 	""" Ansible part """
 	logger.info("Ansible part")
@@ -125,6 +160,10 @@ def run(configfile, workfolder, dryrun=False, shutdownatend=False) :
 	""" we parse the .tfstate file to gather public IPs addresses """
 	logger.info("Parsing .tfstate")
 	host_ips, host_usernames, group_hosts = gather_ips(work_dir, ami2user, logger)
+
+	if len(host_ips) == 0 :
+		logger.info("No hosts available, exit")
+		return
 
 	""" create Ansible config tree """
 	logger.info("Creating Ansible config tree")

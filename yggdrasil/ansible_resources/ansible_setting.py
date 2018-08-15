@@ -7,6 +7,14 @@ import subprocess
 from multiprocessing import Process, Queue, current_process
 import time
 import queue # imported for using queue.Empty exception
+from yggdrasil.common_tools import load_aws_credentials
+
+def ansible_set_aws(logger, work_dir, config):
+
+	""" this function creates an encrypted YAML file for storing AWS credentials for further use by Ansible """
+	cloud_creds = load_aws_credentials(logger, config['infrastructure']['credentials_file'])
+
+	
 
 def gather_ips(work_dir, ami2user, logger) :
 

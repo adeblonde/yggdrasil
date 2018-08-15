@@ -4,6 +4,22 @@ import logging
 from paramiko import SSHClient, AutoAddPolicy
 from scp import SCPClient
 
+def load_aws_credentials(logger, aws_creds_file) :
+
+	""" this function loads the AWS credentials from a file into a dictionary """
+
+	aws_creds = dict()
+
+	try :
+		with open(aws_creds_file, 'r') as f_read :
+			data = f_read.read().split('\n')[1].split(',')
+			aws_creds['aws_access_key_id'] = data[2]
+			aws_creds['aws_secret_key'] = data[3]
+	except Exception as e :
+		logger.info('The input file does not exist or cannot be read : error %s' % e)
+
+	return aws_creds
+
 def create_logger(logfile='') :
 
 	""" this function create a nice logger object """

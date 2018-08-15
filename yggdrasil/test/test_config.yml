@@ -3,6 +3,20 @@
 
   ansible_resources :
     vault_password_file : 'AUTH_DIR/VAULT_PSSWD'
+    vault_dir : 'AUTH_DIR'
+
+  terraform_resources :
+    credentials_dir : 'AUTH_DIR'
+
+  parameters :
+    - AUTH_DIR
+    - CRED_FILE
+    - SSH_KEY
+    - AMI_ID
+    - USERNAME
+    - WORK_DIR
+    - SCENARIO_NAME
+    - VAULT_PSSWD
     
   infrastructure :
     providers :
@@ -13,7 +27,6 @@
         credentials_file : 'AUTH_DIR/CRED_FILE'
         ssh_key : 'SSH_KEY'
         private_ssh_key_path : 'AUTH_DIR/SSH_KEY.pem'
-        encrypted_creds_file : 'AUTH_DIR/ENCRYPT_CRED'
         
         machines :
         - machine :
