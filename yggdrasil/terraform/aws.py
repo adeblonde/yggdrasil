@@ -27,8 +27,11 @@ def terraform_set_aws(logger, DATA_PATH, work_dir, aws_config) :
 	""" create the terraform config file """
 	logger.info("Creating the Terraform config file")
 	
-	# with open(join(tf_resources, 'aws_header.tf'), 'r') as f :
-	# 	tf_header = f.read()
+	with open(join(tf_resources, 'aws_header.tf'), 'r') as f :
+		tf_header = f.read()
+	
+	with open(join(tf_resources, 'aws_security_group.tf'), 'r') as f :
+		tf_security = f.read()
 
 	with open(join(tf_resources, 'aws_instance.tf'), 'r') as f :
 		tf_instance = f.read()
@@ -37,8 +40,8 @@ def terraform_set_aws(logger, DATA_PATH, work_dir, aws_config) :
 	# tf_header = tf_header.replace('AWS_SECRET_KEY',cloud_creds['aws_secret_key'])
 	# tf_header = tf_header.replace('AWS_REGION',config['infrastructure']['region'])
 
-	# tf_config = tf_header
-	tf_config = ''
+	tf_config = tf_header + '\n\n' + tf_security
+	# tf_config = ''
 
 	for model in aws_config['machines'] :
 		model = model['machine']
@@ -50,6 +53,7 @@ def terraform_set_aws(logger, DATA_PATH, work_dir, aws_config) :
 		current_model = current_model.replace('SSH_KEY', aws_config['ssh_key'])
 		current_model = current_model.replace('AMI', model['aws_specs']['AMI'])
 		current_model = current_model.replace('TYPE', model['aws_specs']['type'])
+		current_model = current_model.replace('SECURITY_GROUP', model['aws_specs']['security_group'])
 		""" let's set the groups """
 		group_str = ""
 		if 'groups' in model.keys() :

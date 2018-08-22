@@ -4,6 +4,7 @@
   ansible_resources :
     vault_password_file : 'AUTH_DIR/VAULT_PSSWD'
     vault_dir : 'AUTH_DIR'
+    do_encrypt : false
 
   terraform_resources :
     credentials_dir : 'AUTH_DIR'
@@ -17,8 +18,14 @@
     - WORK_DIR
     - SCENARIO_NAME
     - VAULT_PSSWD
+    - CODE_DIR
     
   infrastructure :
+    terraform_init : false
+    terraform_plan : false
+    terraform_apply : false
+    terraform_refresh : false
+    private_ssh_key_path : 'AUTH_DIR/SSH_KEY.pem'
     providers :
     - provider :
         provider_name : aws
@@ -26,7 +33,6 @@
         profile : developer
         credentials_file : 'AUTH_DIR/CRED_FILE'
         ssh_key : 'SSH_KEY'
-        private_ssh_key_path : 'AUTH_DIR/SSH_KEY.pem'
         
         machines :
         - machine :
@@ -40,8 +46,9 @@
               AMI : AMI_ID
               type : t2.small
               region : 'eu-west-1'
+              security_group : 'basic_sec_group'
             config_script :
-              - 'test_playbooks/config_master'
+              - 'test_playbooks/config_master.yml'
 
         - machine :
             name : worker_machine
@@ -54,8 +61,9 @@
               AMI : AMI_ID
               type : t2.small
               region : 'eu-west-1'
+              security_group : 'basic_sec_group'
             config_script :
-              - 'test_playbooks/config_worker'
+              - 'test_playbooks/config_worker.yml'
 
     - provider :
         provider_name : on-premises
@@ -92,32 +100,32 @@
           - master
           - server
 
+  extra_job_folders :
+    - 'CODE_DIR/yggdrasil/test'
   sync_jobs :
-    extra_job_folders :
-      - 'CODE_DIR/yggdrasil/test'
     job_list :
       - job :
-        name : test_single_job
-        target :
-          - master_machine_0
-        scripts :
-          - playbook_test
+          name : test_single_job
+          target :
+            - master_machine_0
+          scripts :
+            - playbook_test.yml
       - job :
-        name : test_group_job
-        target :
-          - worker
-        scripts :
-          - playbook_test
+          name : test_group_job
+          target :
+            - worker
+          scripts :
+          - playbook_test.yml
   pool_jobs :
     job_list :
       - job :
-        name : test_pool_job
-        type : pool
-        target :
-          - worker
-        scripts :
-          - playbook_test_1
-          - playbook_test_2
+          name : test_pool_job
+          type : pool
+          target :
+            - worker
+          scripts :
+            - playbook_test_1.yml
+            - playbook_test_2.yml
 
   options :
     shutdown_after_complete : false

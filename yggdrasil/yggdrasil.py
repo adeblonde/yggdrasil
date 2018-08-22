@@ -1,5 +1,6 @@
 from .common_tools import *
 from .terraform.aws import *
+from .terraform.tf_run import run_terraform
 from .ansible_resources.ansible_setting import *
 from .security.secure_credentials import *
 # from ansible_templates import *
@@ -14,8 +15,7 @@ import json
 import click
 from os.path import join
 
-# import python_terraform as tf
-from python_terraform import *
+
 
 import pdb
 
@@ -116,25 +116,29 @@ def run(configfile, workfolder, params, variable=None, dryrun=False, shutdownate
 	logger.info("Configuration content : %s" %config)
 	# logger.info("Configuration content : %s" % config['config_name'])
 	tf_cloud_creds = ''
+	ansible_cloud_creds = ''
 	for provider in config['infrastructure']['providers'] :
 		provider = provider['provider']
 
 		if provider['provider_name'] == 'aws' :
 
-			# logger.info("Creating encrypted Ansible AWS credentials file")
-			# auth_dir = config['ansible_resources']['vault_dir']
-			# makedir_p(auth_dir)
-			# aws_encrypted_creds = os.path.join(auth_dir, config['config_name'] + '_aws_encrypted.yml')
+			logger.info("Creating encrypted Ansible AWS credentials file")
+			auth_dir = config['ansible_resources']['vault_dir']
+			makedir_p(auth_dir)
+			aws_encrypted_creds = os.path.join(auth_dir, config['config_name'] + '_aws_encrypted.yml')
 
-			# secure_ansible_aws(logger, auth_dir, provider, aws_encrypted_creds, config['ansible_resources']['vault_password_file'])
-			# logger.info("Successfully created encrypted Ansible creds file %s" % aws_encrypted_creds)
+			if config['ansible_resources']['do_encrypt'] == True :
+				secure_ansible_aws(logger, auth_dir, provider, aws_encrypted_creds, config['ansible_resources']['vault_password_file'])
+				logger.info("Successfully created encrypted Ansible creds file %s" % aws_encrypted_creds)
 
-			# logger.info("Creating Terraform variables file storing AWS credentials")
-			# auth_dir = config['terraform_resources']['credentials_dir']
-			# tf_aws_creds = os.path.join(auth_dir, config['config_name'] + '_aws_creds.tfvars')
-			# secure_tf_aws(logger, auth_dir, provider, tf_aws_creds)
-			# logger.info("Successfully created variables file %s" % tf_aws_creds)
-			# tf_cloud_creds = tf_aws_creds
+			ansible_cloud_creds = os.path.join(auth_dir, aws_encrypted_creds)
+
+			logger.info("Creating Terraform variables file storing AWS credentials")
+			auth_dir = config['terraform_resources']['credentials_dir']
+			tf_aws_creds = os.path.join(auth_dir, config['config_name'] + '_aws_creds.tfvars')
+			secure_tf_aws(logger, auth_dir, provider, tf_aws_creds)
+			logger.info("Successfully created variables file %s" % tf_aws_creds)
+			tf_cloud_creds = tf_aws_creds
 
 			logger.info("Configuring Terraform file")
 			tf_config = terraform_set_aws(logger, DATA_PATH, work_dir, provider)
@@ -144,16 +148,8 @@ def run(configfile, workfolder, params, variable=None, dryrun=False, shutdownate
 
 	""" run Terraform """
 	logger.info("Run Terraform")
-	tf = Terraform(working_dir=work_dir)
-	print(tf.init())
-	logger.info("Terraform loaded")
-	logger.info("Cloud credentials file used : %s" % tf_cloud_creds)
-	logger.info("Planning")
-	print(tf.plan(no_color=IsFlagged, refresh=False, capture_output=True, var_file=tf_cloud_creds))
-	if dryrun == False :
-		logger.info("Applying")
-		print(tf.apply(no_color=IsFlagged, refresh=False, skip_plan=True, var_file=tf_cloud_creds))
-
+	run_terraform(logger, work_dir, config, tf_cloud_creds, dryrun)
+	
 	""" Ansible part """
 	logger.info("Ansible part")
 
@@ -171,15 +167,15 @@ def run(configfile, workfolder, params, variable=None, dryrun=False, shutdownate
 
 	""" create hosts file """
 	logger.info("Creating Ansible hosts file")
-	production_hosts_path = create_host_file(logger, config, host_ips, group_hosts, ansible_production_dir)
+	production_hosts_path = create_host_file(logger, config, host_ips, host_usernames, group_hosts, ansible_production_dir)
 
 	""" set an SSH connection that will accept unknown hosts """	
 	logger.info("Setting SSH connection""")
 	ssh = set_ssh_connection()
 
-	""" sending data to hosts """
-	logger.info("Sending data to remote hosts")
-	scp_data(ssh, logger, host_ips, group_hosts, host_usernames, config, 'sending')
+	# """ sending data to hosts """
+	# logger.info("Sending data to remote hosts")
+	# scp_data(ssh, logger, host_ips, group_hosts, host_usernames, config, 'sending')
 
 	""" collect all ansible playbooks paths """
 	logger.info("Collecting all ansible playbooks paths")
@@ -189,19 +185,23 @@ def run(configfile, workfolder, params, variable=None, dryrun=False, shutdownate
 
 	""" collecting all synchronous jobs """
 	logger.info("Collecting all synchronous jobs")
-	main_ansible_path = collect_synchronous_jobs(logger, config, ansible_roles_dir, ansible_dir, playbooks_path)
+	main_ansible_path = collect_synchronous_jobs(logger, config, ansible_roles_dir, ansible_dir, playbooks_path, ansible_cloud_creds)
 
 	""" Execution of synchronous jobs """
 	logger.info("Executing Ansible synchronous tasks")
 	try :
-		result = subprocess.call(['/usr/bin/ansible-playbook', '-i', production_hosts_path, main_ansible_path])
+		command = ['/usr/bin/ansible-playbook', '-i', production_hosts_path, main_ansible_path,
+		'--vault-password-file', config['ansible_resources']['vault_password_file'],
+		'--key-file', config['infrastructure']['private_ssh_key_path']]
+		logger.info("Executing ansible with command %s" % (' '.join(command)))
+		result = subprocess.call(command, env={'ANSIBLE_HOST_KEY_CHECKING':'False'})
 		logger.info("Result of ansible call : %s" % result)
 	except :
 		logger.info("Problem in the execution of ansible playbooks")
 
 	""" implementing workers pool jobs """
 	logger.info("Collecting Ansible asynchronous tasks")
-	processes = prepare_pool_jobs(logger, config, ansible_dir, production_hosts_path, playbooks_path, group_hosts)
+	processes = prepare_pool_jobs(logger, config, ansible_dir, production_hosts_path, playbooks_path, group_hosts, ansible_cloud_creds)
 
 	logger.info("Executing Ansible asynchronous tasks")
 	for p in processes :

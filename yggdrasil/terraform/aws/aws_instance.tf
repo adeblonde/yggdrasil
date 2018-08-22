@@ -8,6 +8,8 @@ resource "aws_instance" "NAME" {
     user = "HOST_USERNAME"
   }
 
+  security_groups = ["SECURITY_GROUP"]
+
   tags {
     Name = "INSTANCE_NAME"
 

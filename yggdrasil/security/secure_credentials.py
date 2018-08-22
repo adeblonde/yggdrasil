@@ -53,7 +53,7 @@ def secure_tf_aws(logger, auth_dir, aws_config, tf_aws_creds_file_path, aws_regi
 
 	aws_creds = load_aws_credentials(logger, aws_config['credentials_file'])
 
-	makedir_p(os.path.basename(tf_aws_creds_file_path))
+	makedir_p(os.path.dirname(tf_aws_creds_file_path))
 
 	aws_creds_str = template_creds_aws.replace('ACCESS_KEY_HERE', aws_creds['aws_access_key_id'])
 	aws_creds_str = aws_creds_str.replace('SECRET_KEY_HERE', aws_creds['aws_secret_key'])

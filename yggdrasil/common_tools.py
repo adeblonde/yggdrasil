@@ -78,7 +78,9 @@ def scp_data(ssh, logger, host_ips, group_hosts, host_usernames, config, mode='s
 		if 'by_names' in file_group.keys() :
 			for host_name in file_group['by_names'] :
 				try :
+					logger.info("Connecting to host %s with user %s and key %s" % (host_ips[host_name], host_usernames[host_name], config['infrastructure']['private_ssh_key_path']))
 					ssh.connect(host_ips[host_name], username=host_usernames[host_name], key_filename=config['infrastructure']['private_ssh_key_path'])
+					logger.info("Connection set sucessfully")
 					with SCPClient(ssh.get_transport()) as scp :
 						if mode == 'sending' :
 							scp.put(file_group['origin'], file_group['destination'])
@@ -94,7 +96,9 @@ def scp_data(ssh, logger, host_ips, group_hosts, host_usernames, config, mode='s
 			for group_name in file_group['by_groups'] :
 				for host_name in group_hosts[group_name] :
 					try :
+						logger.info("Connecting to host %s with user %s and key %s" % (host_ips[host_name], host_usernames[host_name], config['infrastructure']['private_ssh_key_path']))
 						ssh.connect(host_ips[host_name], username=host_usernames[host_name], key_filename=config['infrastructure']['private_ssh_key_path'])
+						logger.info("Connection set sucessfully")
 						with SCPClient(ssh.get_transport()) as scp :
 							if mode == 'sending' :
 								scp.put(file_group['origin'], file_group['destination'])
