@@ -1,84 +1,133 @@
 ---
-- config_name : test_config
+  config_name : test_config
 
+  ansible_resources :
+    vault_password_file : 'AUTH_DIR/VAULT_PSSWD'
+    vault_dir : 'AUTH_DIR'
+    do_encrypt : false
+
+  terraform_resources :
+    credentials_dir : 'AUTH_DIR'
+
+  parameters :
+    - AUTH_DIR
+    - CRED_FILE
+    - SSH_KEY
+    - AMI_ID
+    - USERNAME
+    - WORK_DIR
+    - SCENARIO_NAME
+    - VAULT_PSSWD
+    - CODE_DIR
+    
   infrastructure :
-  - provider : aws
-  - region : 'eu-west-1'
-  - profile : developer
-  - credentials_file : 'AUTH_DIR/CRED_FILE'
-  - ssh_key : 'AUTH_DIR/SSH_KEY'
-  - vault_password_file : 'AUTH_DIR/VAULT_PSSWD'
-  - encrypted_creds_file : 'AUTH_DIR/ENCRYPT_CRED'
-  - machines :
-    - model_1 : 
-        name : master_machine
-        number : 1
-        groups :
-          - master
-          - front
-        aws_specs :
-          - AMI : XXXX
-          - type : t2.small
-          - region : 'eu-west-1'
-        config_scripts :
-          - 'test_playbooks/config_master.yml'
+    terraform_init : false
+    terraform_plan : false
+    terraform_apply : false
+    terraform_refresh : false
+    private_ssh_key_path : 'AUTH_DIR/SSH_KEY.pem'
+    providers :
+    - provider :
+        provider_name : aws
+        region : 'eu-west-1'
+        profile : developer
+        credentials_file : 'AUTH_DIR/CRED_FILE'
+        ssh_key : 'SSH_KEY'
+        
+        machines :
+        - machine :
+            name : master_machine
+            user : ubuntu
+            number : 1
+            groups :
+              - master
+              - front
+            aws_specs :
+              AMI : AMI_ID
+              type : t2.small
+              region : 'eu-west-1'
+              security_group : 'basic_sec_group'
+            config_script :
+              - 'test_playbooks/config_master.yml'
 
-    - model_2 : 
-        name : worker_machine
-        number : 2
-        groups :
-          - worker
-          - server
-        aws_specs :
-          - AMI : XXXX
-          - type : t2.small
-          - region : 'eu-west-1'
-        config_scripts :
-          - 'test_playbooks/config_worker.yml'
+        - machine :
+            name : worker_machine
+            user : ubuntu
+            number : 2
+            groups :
+              - worker
+              - server
+            aws_specs :
+              AMI : AMI_ID
+              type : t2.small
+              region : 'eu-west-1'
+              security_group : 'basic_sec_group'
+            config_script :
+              - 'test_playbooks/config_worker.yml'
+
+    - provider :
+        provider_name : on-premises
+        profile : developer
+        private_ssh_key_path : 'AUTH_DIR/SSH_KEY.pem'
+        machines :
+        - machine :
+            name : local_host
+            user : USERNAME
+            groups :
+              - master
 
   data_sending :
-    - test_file :
-        origin : 'WORK_DIR/test.txt'
+    - data :
+        origin : 'WORK_DIR/SCENARIO_NAME/test.txt'
         destination : '/home/ubuntu'
         isfolder : False
         by_names :
-        - master_machine_0
-        - worker_machine_0
+          - master_machine_0
+          - worker_machine_0
         by_groups :
-        - master
-        - server
+          - master
+          - server
 
   data_receiving :
-    - test_file :
-        origin : 'WORK_DIR/test.txt'
+    - data :
+        origin : 'WORK_DIR/SCENARIO_NAME/test.txt'
         destination : '/home/ubuntu'
         isfolder : False
         by_names :
-        - master_machine_0
-        - worker_machine_0
+          - master_machine_0
+          - worker_machine_0
         by_groups :
-        - master
-        - server
+          - master
+          - server
 
-  jobs :
-  - job_single :
-      name : job_single
-      target : master_machine_0
-      job_scripts :
-        - 'test_playbooks/job_single.yml'
-  - job_group :
-      name : job_group
-      target : worker
-      job_scripts :
-        - 'test_playbooks/job_group.yml'
-  - job_pool :
-      name : job_pool
-      target : worker
-      job_scripts :
-        - 'test_playbooks/job_pool_1.yml'
-        - 'test_playbooks/job_pool_2.yml'
+  extra_job_folders :
+    - 'CODE_DIR/yggdrasil/test'
+  sync_jobs :
+    job_list :
+      - job :
+          name : test_single_job
+          target :
+            - master_machine_0
+          scripts :
+            - playbook_test.yml
+      - job :
+          name : test_group_job
+          target :
+            - worker
+          scripts :
+          - playbook_test.yml
+  pool_jobs :
+    job_list :
+      - job :
+          name : test_pool_job
+          type : pool
+          target :
+            - worker
+          scripts :
+            - playbook_test_1.yml
+            - playbook_test_2.yml
 
   options :
-  - shutdown_after_complete : false
-  - data_only : false
-  - no_data : false
+    shutdown_after_complete : false
+    data_only : false
+    no_data : false
