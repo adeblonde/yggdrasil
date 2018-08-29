@@ -30,4 +30,13 @@ def run_terraform(logger, work_dir, config, tf_cloud_creds, dryrun) :
 	if 'terraform_refresh' in config['infrastructure'].keys() :
 		if config['infrastructure']['terraform_refresh'] == True :
 			logger.info('Refreshing')
-			print(tf.refresh(no_color=IsFlagged, var_file=tf_cloud_creds))	
+			print(tf.refresh(no_color=IsFlagged, var_file=tf_cloud_creds))
+
+def destroy_terraform(logger, work_dir, tf_cloud_creds) :
+
+	""" this function destroys Terraform infrastructure contained in .tfstate """
+	tf = Terraform(working_dir=work_dir)
+	logger.info("Refreshing before destruction")
+	print(tf.refresh(no_color=IsFlagged, var_file=tf_cloud_creds))
+	logger.info("Destroying")
+	print(tf.destroy(no_color=IsFlagged, capture_output=True, var_file=tf_cloud_creds))
