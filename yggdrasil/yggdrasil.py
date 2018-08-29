@@ -1,6 +1,6 @@
 from .common_tools import *
 from .terraform.aws import *
-from .terraform.tf_run import run_terraform
+from .terraform.tf_run import run_terraform, destroy_terraform
 from .ansible_resources.ansible_setting import *
 from .security.secure_credentials import *
 # from ansible_templates import *
@@ -109,6 +109,9 @@ def run(configfile, workfolder, params, variable=None, dryrun=False, shutdownate
 	""" Terraform part """
 	logger.info("Terraform part")
 
+	
+
+
 	""" init terraform config file """
 	tf_config = ''
 
@@ -142,6 +145,13 @@ def run(configfile, workfolder, params, variable=None, dryrun=False, shutdownate
 
 			logger.info("Configuring Terraform file")
 			tf_config = terraform_set_aws(logger, DATA_PATH, work_dir, provider)
+
+	""" check for special options """
+	
+	""" Destroy infrastructure """
+	if config['options']['destroy'] == True :
+		logger.info("Destroy infrastructure")
+		destroy_terraform(logger, work_dir, tf_cloud_creds)
 
 	with open(join(work_dir, config['config_name'] + '.tf'), 'w') as f :
 		f.write(tf_config)

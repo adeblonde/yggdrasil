@@ -4,7 +4,7 @@
   ansible_resources :
     vault_password_file : 'AUTH_DIR/VAULT_PSSWD'
     vault_dir : 'AUTH_DIR'
-    do_encrypt : false
+    do_encrypt : true
 
   terraform_resources :
     credentials_dir : 'AUTH_DIR'
@@ -21,9 +21,9 @@
     - CODE_DIR
     
   infrastructure :
-    terraform_init : false
-    terraform_plan : false
-    terraform_apply : false
+    terraform_init : true
+    terraform_plan : true
+    terraform_apply : true
     terraform_refresh : false
     private_ssh_key_path : 'AUTH_DIR/SSH_KEY.pem'
     providers :
@@ -128,6 +128,7 @@
             - playbook_test_2.yml
 
   options :
+    destroy : false
     shutdown_after_complete : false
     data_only : false
     no_data : false

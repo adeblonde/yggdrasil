@@ -14,7 +14,8 @@ setup(name='yggdrasil',
 	  packages=['yggdrasil'],
 	  install_requires=[
 		  'Click',
-		  'python-terraform'
+		  'python-terraform',
+		  'pyyaml'
 	  ],
 	  entry_points={
 		'console_scripts': 
@@ -26,4 +27,4 @@ setup(name='yggdrasil',
 	  test_suite='nose.collector',
 	  tests_require=['nose'],
 	  include_package_data=True,
-	  zip_safe=False) 
+	  zip_safe=False)

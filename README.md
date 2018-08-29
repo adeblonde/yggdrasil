@@ -30,6 +30,29 @@ So why use Yggdrasil ? Here are the main reasons :
 
 ## How does it work
 
+### Quick start
+
+In order to use Yggdrasil, you must first install it :
+
+```bash
+git clone https://github.com/adeblonde/yggdrasil.git
+```
+
+then, enter the git folder, and run the pip installation command :
+
+```bash
+cd yggdrasil
+sudo pip3 install -e .
+```
+
+You are now ready to use Yggdrasil command-line tool. To use it, you must create a Yggdrasil configuration file in yaml (a template is provided in  `yggdrasil/test/test_config.yml`) and a parameters file (a template is provided in (`tools/yggdrasil_params_template`). You must also choose a work folder, where a subfolder containing various files associated with your use case will be created. Then run :
+
+```bash
+ygg -p /path/to/parameters_file.yml -w /path/to/work_folder /path/to/configuration_file.yml
+```
+
+### Understanding the tool
+
 Let us take a close look at an Yggdrasil configuration file to understand how it works :
 
 ```yaml
@@ -199,13 +222,15 @@ You can use playbooks listed in the sources of Yggdrasil (`yggdrasil/yggdrasil/p
 
 ```yaml
   options :
+	destroy : false
     shutdown_after_complete : false
     data_only : false
     no_data : false
 ```
 
-Here are some special options for Yggdrasil (not yet implemented) :
+Here are some special options for Yggdrasil (all of them not yet implemented) :
 
+- `destroy` : destroy the whole infrastructure defined in the .tfstate of the work folder, without any other operations or tasks
 - `shutdown_after_complete` : destroy all cloud machines after the execution of all tasks
 - `data_only` : use Yggdrasil only to send/receive data to remote hosts. All other actions are deactivated (Terraform & Ansible) (useful to avoid complex scp command line actions)
 - `no_data` : do not send/receive data. This part of Yggdrasil is deactivated (useful when sending huge data files only once)
